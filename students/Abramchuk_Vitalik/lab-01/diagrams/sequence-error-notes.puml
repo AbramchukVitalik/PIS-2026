@@ -1,0 +1,47 @@
+@startuml
+actor User as "Пользователь"
+participant "Web UI" as UI
+participant "Notes API" as API
+database "Database" as DB
+participant "Notification Worker" as NotifyWorker
+participant "Push Service" as Push
+
+note over User, DB
+Пользователь хочет создать совместную заметку
+с приглашением другого редактора и метками.
+end note
+
+User -> UI: Открыть приложение и создать заметку
+UI -> API: POST /api/notes
+activate API
+
+API -> DB: INSERT INTO notes(title, content, created_by)
+activate DB
+DB --> API: note_id=NOTE-16-001
+
+API -> DB: INSERT INTO note_tags(note_id, tag)
+DB --> API: OK
+
+API -> DB: INSERT INTO note_collaborators(note_id, user_email)
+DB --> API: OK
+
+API --> UI: 201 Created {note_id: "NOTE-16-001"}
+deactivate API
+UI --> User: Показать сообщение "Заметка создана и готова к совместной работе"
+
+== Асинхронная отправка уведомлений ==
+
+API -> NotifyWorker: publish(NoteCreated, note_id=NOTE-16-001)
+activate NotifyWorker
+NotifyWorker -> Push: sendPush(collaborator, "Вы приглашены к совместной заметке")
+activate Push
+Push --> NotifyWorker: Message sent ✅
+deactivate Push
+NotifyWorker -> DB: UPDATE notifications SET status='delivered'
+activate DB
+DB --> NotifyWorker: OK
+deactivate DB
+NotifyWorker --> API: ACK
+deactivate NotifyWorker
+
+@enduml

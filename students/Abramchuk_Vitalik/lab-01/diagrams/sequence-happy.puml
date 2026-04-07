@@ -1,0 +1,55 @@
+@startuml
+title Успешный сценарий: Создание совместной заметки и уведомление участников
+
+actor "Пользователь" as User
+participant "Web UI" as UI
+participant "Notes API" as API
+database "Database" as DB
+queue "Event Bus" as Bus
+participant "Notification Worker" as NotifyWorker
+participant "Push Service" as Push
+
+== Транзакция №1: Создание заметки ==
+
+User -> UI: Создать заметку с заголовком и содержанием
+UI -> API: POST /api/notes {title, content, tags, collaborators}
+activate API
+
+API -> DB: BEGIN TRANSACTION
+activate DB
+API -> DB: INSERT INTO notes(title, content, created_by)
+DB --> API: note_id=NOTE-16-001
+API -> DB: INSERT INTO note_tags(note_id, tag)
+DB --> API: OK
+API -> DB: INSERT INTO note_collaborators(note_id, user_email)
+DB --> API: OK
+API -> DB: COMMIT TRANSACTION
+DB --> API: Committed
+deactivate DB
+
+API -> Bus: publish(NoteCreated, note_id='NOTE-16-001')
+activate Bus
+Bus --> API: ACK
+deactivate Bus
+
+API --> UI: 201 Created {note_id: "NOTE-16-001"}
+deactivate API
+UI --> User: Показать сообщение "Заметка создана и готова к совместной работе"
+
+== Асинхронная отправка уведомлений ==
+
+Bus -> NotifyWorker: consume(NoteCreated)
+activate NotifyWorker
+NotifyWorker -> NotifyWorker: Формирование списка получателей
+NotifyWorker -> Push: sendPush(collaborator, "Вы приглашены к совместной заметке")
+activate Push
+Push --> NotifyWorker: Message sent ✅
+deactivate Push
+NotifyWorker -> DB: UPDATE notifications SET status='delivered'
+activate DB
+DB --> NotifyWorker: OK
+deactivate DB
+NotifyWorker --> API: ACK
+deactivate NotifyWorker
+
+@enduml
