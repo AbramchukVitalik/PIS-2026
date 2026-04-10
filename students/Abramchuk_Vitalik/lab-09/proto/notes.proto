@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package notes;
+
+// ===== Service =====
+service NotesService {
+  rpc CreateNote (CreateNoteRequest) returns (CreateNoteResponse);
+  rpc GetNote (GetNoteRequest) returns (NoteResponse);
+  rpc StreamNotes (StreamNotesRequest) returns (stream NoteResponse);
+}
+
+// ===== Messages =====
+message CreateNoteRequest {
+  string notebook_id = 1;
+  string author_id = 2;
+  string content = 3;
+}
+
+message CreateNoteResponse {
+  string note_id = 1;
+}
+
+message GetNoteRequest {
+  string note_id = 1;
+}
+
+message StreamNotesRequest {
+  string notebook_id = 1;
+}
+
+message NoteResponse {
+  string note_id = 1;
+  string notebook_id = 2;
+  string author_id = 3;
+  string content = 4;
+}
